@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ── */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(145deg, #f8f9ff 0%, #f3f1ff 50%, #faf5ff 100%);
+  min-height: 100vh;
+}
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Card 3-D flip (Study page) ── */
+.flip-card-container {
+  perspective: 1200px;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+
+.flip-card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flip-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.flip-card-back-face {
+  transform: rotateY(180deg);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #c7d2fe; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #818cf8; }
+
+/* ── Smooth scroll ── */
+html { scroll-behavior: smooth; }
+
+/* ── Blob animation ── */
+.delay-2000 { animation-delay: 2s; }
+.delay-4000 { animation-delay: 4s; }
+
+/* ── Floating card animations (Login / Register dark page) ── */
+@keyframes floatA {
+  0%, 100% { transform: translateY(0px)   rotate(-8deg); }
+  50%       { transform: translateY(-22px) rotate(-8deg); }
+}
+@keyframes floatB {
+  0%, 100% { transform: translateY(0px)   rotate(6deg); }
+  50%       { transform: translateY(-18px) rotate(6deg); }
+}
+@keyframes floatC {
+  0%, 100% { transform: translateY(0px)   rotate(-4deg); }
+  50%       { transform: translateY(-26px) rotate(-4deg); }
+}
+@keyframes floatD {
+  0%, 100% { transform: translateY(0px)   rotate(10deg); }
+  50%       { transform: translateY(-14px) rotate(10deg); }
+}
+
+.float-a { animation: floatA 7s ease-in-out infinite; }
+.float-b { animation: floatB 9s ease-in-out infinite 1.5s; }
+.float-c { animation: floatC 6s ease-in-out infinite 3s; }
+.float-d { animation: floatD 8s ease-in-out infinite 0.8s; }
+
+/* ── Orb pulse (Login / Register dark page) ── */
+@keyframes orbPulse {
+  0%, 100% { opacity: 0.18; transform: scale(1); }
+  50%       { opacity: 0.28; transform: scale(1.08); }
+}
+.orb-pulse-1 { animation: orbPulse 8s ease-in-out infinite; }
+.orb-pulse-2 { animation: orbPulse 11s ease-in-out infinite 2s; }
+.orb-pulse-3 { animation: orbPulse 9s ease-in-out infinite 4s; }
