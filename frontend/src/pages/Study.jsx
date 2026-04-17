@@ -107,6 +107,7 @@ export default function Study() {
   const [cards, setCards]               = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped]           = useState(false);
+  const [animPhase, setAnimPhase]       = useState('idle'); // 'idle' | 'out' | 'in'
   const [loading, setLoading]           = useState(true);
   const [submitting, setSubmitting]     = useState(false);
   const [done, setDone]                 = useState(false);
@@ -137,6 +138,23 @@ export default function Study() {
     finally { setLoading(false); }
   };
 
+  // Kick off the two-phase flip animation.
+  // Phase 1 (flip-out) runs via CSS; onAnimationEnd swaps content and starts phase 2.
+  const handleFlip = () => {
+    if (animPhase !== 'idle' || flipped) return;
+    setAnimPhase('out');
+  };
+
+  // Called by the container's onAnimationEnd to drive the phase transition.
+  const handleAnimationEnd = () => {
+    if (animPhase === 'out') {
+      setFlipped(true);      // swap to answer face
+      setAnimPhase('in');    // start flip-in
+    } else if (animPhase === 'in') {
+      setAnimPhase('idle');  // animation complete
+    }
+  };
+
   const handleRate = async (quality) => {
     if (submitting) return;
     setSubmitting(true);
@@ -150,6 +168,7 @@ export default function Study() {
     } else {
       setCurrentIndex((i) => i + 1);
       setFlipped(false);
+      setAnimPhase('idle');
     }
     setSubmitting(false);
   };
@@ -161,6 +180,7 @@ export default function Study() {
     setDone(false);
     setCurrentIndex(0);
     setFlipped(false);
+    setAnimPhase('idle');
     setResults({ again: 0, hard: 0, good: 0, easy: 0 });
     setAutoSwitched(false);
     setLoading(true);
@@ -327,17 +347,21 @@ export default function Study() {
   /* ══════════════════════════════════════
      STUDY SCREEN
   ══════════════════════════════════════ */
-  const card     = cards[currentIndex];
-  const progress = (currentIndex / cards.length) * 100;
+  const card          = cards[currentIndex];
+  const progress      = (currentIndex / cards.length) * 100;
+  const answerIsLong  = card.back.length > 300;
 
   return (
     <DarkPage>
-      <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8 flex flex-col flex-1">
+      <div
+        className="max-w-2xl mx-auto w-full px-4 pt-5 pb-4 flex flex-col overflow-hidden"
+        style={{ height: 'calc(100vh - 64px)' }}
+      >
 
-        {/* ── Auto-switch dark glass banner ── */}
+        {/* ── Auto-switch banner — flex-shrink-0 so it never squashes card ── */}
         {autoSwitched && (
           <div
-            className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-5 text-xs font-semibold"
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-4 text-xs font-semibold flex-shrink-0"
             style={{
               background: 'rgba(99,102,241,0.08)',
               border: '1px solid rgba(99,102,241,0.28)',
@@ -355,8 +379,8 @@ export default function Study() {
           </div>
         )}
 
-        {/* ── Top bar ── */}
-        <div className="flex items-center justify-between mb-5 min-w-0">
+        {/* ── Top bar — flex-shrink-0 ── */}
+        <div className="flex items-center justify-between mb-4 min-w-0 flex-shrink-0">
           <Link
             to={`/decks/${id}`}
             className="flex items-center gap-2 text-sm font-medium transition min-h-[44px] pr-3 truncate group"
@@ -371,7 +395,6 @@ export default function Study() {
           </Link>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Mode pill */}
             <span
               className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
               style={activeMode === 'all'
@@ -381,7 +404,6 @@ export default function Study() {
             >
               {activeMode === 'all' ? 'All' : 'Due'}
             </span>
-            {/* Counter */}
             <div className="flex items-center gap-1 text-sm font-bold"
               style={{ color: 'rgba(255,255,255,0.35)' }}>
               <span style={{
@@ -396,8 +418,8 @@ export default function Study() {
           </div>
         </div>
 
-        {/* ── Progress bar ── */}
-        <div className="h-1.5 rounded-full mb-7 sm:mb-8 overflow-hidden"
+        {/* ── Progress bar — flex-shrink-0 ── */}
+        <div className="h-1.5 rounded-full mb-4 overflow-hidden flex-shrink-0"
           style={{ background: 'rgba(255,255,255,0.07)' }}>
           <div
             className="h-full rounded-full transition-all duration-700 ease-out"
@@ -409,21 +431,35 @@ export default function Study() {
           />
         </div>
 
-        {/* ── 3-D flip card ── */}
-        <div
-          className="flip-card-container mb-5 sm:mb-6 cursor-pointer select-none w-full flex-shrink-0"
-          style={{ height: '260px' }}
-          onClick={() => !flipped && setFlipped(true)}
-        >
-          <div className={`flip-card-inner ${flipped ? 'is-flipped' : ''}`}>
+        {/*
+          ── Flip card ──
+          The WHOLE container rotates on its Y-axis in two phases:
+            Phase 1 (is-flipping-out): 0° → 90°  — card disappears at the edge
+            onAnimationEnd: swap question ↔ answer, start phase 2
+            Phase 2 (is-flipping-in):  -90° → 0° — card reappears with new content
 
-            {/* Front face — dark glass */}
+          Only ONE face is in the DOM at a time, so height = content height always.
+          Short answer → small card.  Long answer → grows up to max-height then scrolls.
+        */}
+        <div
+          className={`card-flip-container select-none w-full mb-4 ${
+            animPhase === 'out' ? 'is-flipping-out' :
+            animPhase === 'in'  ? 'is-flipping-in'  : ''
+          }`}
+          style={{ borderRadius: '24px', overflow: 'clip' }}
+          onClick={() => animPhase === 'idle' && !flipped && handleFlip()}
+          onAnimationEnd={handleAnimationEnd}
+        >
+          {!flipped ? (
+            /* ── Question face ── */
             <div
-              className="flip-card-face flex flex-col items-center justify-center p-6 sm:p-10 text-center overflow-y-auto"
+              className="card-face flex flex-col items-center justify-center p-6 sm:p-10 text-center cursor-pointer"
               style={{
-                background: 'rgba(255,255,255,0.04)',
+                background: 'rgba(255,255,255,0.07)',
                 border: '1px solid rgba(255,255,255,0.09)',
-                backdropFilter: 'blur(20px)',
+                minHeight: '160px',
+                maxHeight: 'calc(100vh - 420px)',
+                WebkitFontSmoothing: 'antialiased',
               }}
             >
               <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-5 px-3 py-1.5 rounded-full flex-shrink-0"
@@ -443,64 +479,74 @@ export default function Study() {
                 tap to reveal
               </p>
             </div>
-
-            {/* Back face — gradient */}
+          ) : (
+            /* ── Answer face ── */
             <div
-              className="flip-card-face flip-card-back-face flex flex-col items-center justify-center p-6 sm:p-10 text-center overflow-y-auto"
-              style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%)' }}
+              className="card-face flex flex-col items-center justify-start p-6 sm:p-8 text-center"
+              style={{
+                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%)',
+                minHeight: '160px',
+                maxHeight: 'calc(100vh - 420px)',
+                paddingBottom: '40px',
+                boxSizing: 'border-box',
+                WebkitFontSmoothing: 'antialiased',
+              }}
             >
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-5 px-3 py-1.5 rounded-full flex-shrink-0"
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-4 px-3 py-1.5 rounded-full flex-shrink-0"
                 style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.7)' }}>
                 <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Answer
               </span>
-              <p className="text-base sm:text-lg font-semibold text-white leading-relaxed">
+              <p className={`${answerIsLong ? 'text-sm' : 'text-base sm:text-lg'} font-semibold text-white leading-relaxed`}>
                 {card.back}
               </p>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* ── Actions ── */}
-        {!flipped ? (
-          <button
-            onClick={() => setFlipped(true)}
-            className="w-full font-bold text-base text-white py-4 rounded-2xl transition-all min-h-[52px]"
-            style={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              boxShadow: '0 8px 32px rgba(99,102,241,0.35)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 12px 40px rgba(99,102,241,0.5)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 8px 32px rgba(99,102,241,0.35)'; e.currentTarget.style.transform = ''; }}
-          >
-            Reveal Answer
-          </button>
-        ) : (
-          <div className="space-y-3 animate-fade-up">
-            <p className="text-center text-[10px] font-bold uppercase tracking-widest"
-              style={{ color: 'rgba(255,255,255,0.25)' }}>
-              How well did you remember?
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {RATINGS.map(({ label, quality, gradient, glow, desc }) => (
-                <button
-                  key={label}
-                  onClick={() => handleRate(quality)}
-                  disabled={submitting}
-                  className={`bg-gradient-to-br ${gradient} text-white rounded-2xl py-4 px-3 font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[64px]`}
-                  style={{ boxShadow: `0 6px 20px ${glow}` }}
-                  onMouseEnter={e => { if (!submitting) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 12px 28px ${glow}`; } }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = `0 6px 20px ${glow}`; }}
-                >
-                  <div className="font-bold">{label}</div>
-                  <div className="text-xs opacity-70 mt-0.5 font-medium">{desc}</div>
-                </button>
-              ))}
+        {/* ── Actions — always below the card, never compressed ── */}
+        <div className="flex-shrink-0">
+          {!flipped ? (
+            <button
+              onClick={handleFlip}
+              className="w-full font-bold text-base text-white py-4 rounded-2xl transition-all min-h-[52px]"
+              style={{
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                boxShadow: '0 8px 32px rgba(99,102,241,0.35)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 12px 40px rgba(99,102,241,0.5)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 8px 32px rgba(99,102,241,0.35)'; e.currentTarget.style.transform = ''; }}
+            >
+              Reveal Answer
+            </button>
+          ) : (
+            <div className="space-y-2.5 animate-fade-up">
+              <p className="text-center text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: 'rgba(255,255,255,0.25)' }}>
+                How well did you remember?
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                {RATINGS.map(({ label, quality, gradient, glow, desc }) => (
+                  <button
+                    key={label}
+                    onClick={() => handleRate(quality)}
+                    disabled={submitting}
+                    className={`bg-gradient-to-br ${gradient} text-white rounded-2xl py-3 sm:py-4 px-3 font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[56px] sm:min-h-[64px]`}
+                    style={{ boxShadow: `0 6px 20px ${glow}` }}
+                    onMouseEnter={e => { if (!submitting) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 12px 28px ${glow}`; } }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = `0 6px 20px ${glow}`; }}
+                  >
+                    <div className="font-bold">{label}</div>
+                    <div className="text-xs opacity-70 mt-0.5 font-medium">{desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
       </div>
     </DarkPage>
   );

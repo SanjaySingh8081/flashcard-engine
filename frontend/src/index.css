@@ -17,34 +17,40 @@ body {
   background-clip: text;
 }
 
-/* ── Card 3-D flip (Study page) ── */
-.flip-card-container {
-  perspective: 1200px;
+/* ── Card flip (Study page) ── */
+/*
+ * The whole card container rotates on its Y-axis.
+ * Only ONE face is rendered at a time so card height = content height.
+ * Phase 1 (flip-out): card rotates 0→90deg and disappears at the edge.
+ * Content is swapped at 90deg (onAnimationEnd).
+ * Phase 2 (flip-in): card rotates -90→0deg and reappears with new content.
+ */
+.card-flip-container {
+  perspective: 900px;
 }
 
-.flip-card-inner {
-  position: relative;
+@keyframes card-flip-out {
+  from { transform: rotateY(0deg);  }
+  to   { transform: rotateY(90deg); }
+}
+@keyframes card-flip-in {
+  from { transform: rotateY(-90deg); }
+  to   { transform: rotateY(0deg);   }
+}
+
+.card-flip-container.is-flipping-out {
+  animation: card-flip-out 0.18s ease-in forwards;
+}
+.card-flip-container.is-flipping-in {
+  animation: card-flip-in 0.18s ease-out forwards;
+}
+
+/* Single face — always in normal flow, sizes the container */
+.card-face {
   width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
-}
-
-.flip-card-inner.is-flipped {
-  transform: rotateY(180deg);
-}
-
-.flip-card-face {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   border-radius: 24px;
-  overflow: hidden;
-}
-
-.flip-card-back-face {
-  transform: rotateY(180deg);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ── Scrollbar ── */
